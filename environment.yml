@@ -1,0 +1,9 @@
+name: momenta
+channels:
+  - defaults
+dependencies:
+  - python=3.8
+  - torchvision=0.11
+  - pytorch=1.10
+  - cudatoolkit=11.3
+prefix: /home/c01bosh/miniconda3/envs/momenta

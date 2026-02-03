@@ -60,7 +60,7 @@ torch.cuda.empty_cache()
 
 
 # Harmful Meme dataset (Covid-Ternary data)
-data_dir_cov = "path_to_images/images"
+data_dir_cov = "./HarMeme_V1/images_flat"
 train_path_cov = "path_to_jsonl/train.jsonl"
 dev_path_cov   = "path_to_jsonl/val.jsonl"
 # test_path_cov  = "path_to_jsonl/test.jsonl"
@@ -486,6 +486,8 @@ class HarmemeMemesDatasetAug2(torch.utils.data.Dataset):
         self.samples_frame.image = self.samples_frame.apply(
             lambda row: (img_dir + '/' + row.image), axis=1
         )
+        self.ROI_samples = None
+        self.ENT_samples = None
         if split_flag=='train':
             self.ROI_samples = train_ROI
             self.ENT_samples = train_ENT
@@ -515,7 +517,8 @@ class HarmemeMemesDatasetAug2(torch.utils.data.Dataset):
         image_clip_input = process_image_clip(self.samples_frame.loc[idx, "image"])
 # --------------------------------------------------------------------------------------        
 #         Pre-extracted features
-        image_vgg_feature = self.ROI_samples[idx]        
+        image_vgg_feature = torch.zeros(4096).to(device)
+       
 # --------------------------------------------------------------------------------------
 # On-demand computation
 #         BB_info = self.samples_frame.loc[idx, "bbdict"]
@@ -549,7 +552,7 @@ class HarmemeMemesDatasetAug2(torch.utils.data.Dataset):
 #         -------------------------------------------------------------------------------
 #         Process entities
         #         Use them directly from the saved files
-        text_drob_feature = self.ENT_samples[idx]
+        text_drob_feature = torch.zeros(768).to(device)
 #         -------------------------------------------------------------------------------
 #         Get the mean representation for the set of entities ""on-demand
 #         cur_ent_rep_list = []
