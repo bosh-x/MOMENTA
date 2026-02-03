@@ -1210,15 +1210,13 @@ if __name__ == "__main__":
     print(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
 
-    # Import EarlyStopping
+    # Import EarlyStopping (using local pytorchtools.py)
     try:
-        import sys
-        sys.path.append('early-stopping-pytorch')  # Adjust this path if needed
         from pytorchtools import EarlyStopping
         print("  ✓ EarlyStopping imported successfully")
-    except ImportError:
-        print("  ⚠ Warning: EarlyStopping not found. Please ensure pytorchtools is available.")
-        print("  You can download it from: https://github.com/Bjarten/early-stopping-pytorch")
+    except ImportError as e:
+        print(f"  ✗ Error: Failed to import EarlyStopping: {e}")
+        print("  Please ensure pytorchtools.py is in the current directory.")
         raise
 
     # total_params = sum(p.numel() for p in model.parameters())
