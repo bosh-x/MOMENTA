@@ -115,16 +115,24 @@ DATASET_TO_USE = 'Harm-P'  # 切换到 Politics 数据集
 3. HarMeme_V1 数据集在正确位置
 
 ### Q2: ImportError: No module named 'pytorchtools'
-下载 EarlyStopping:
-```bash
-git clone https://github.com/Bjarten/early-stopping-pytorch.git
+项目已包含 `pytorchtools.py`，不需要额外下载。
+如果还是报错，确保该文件在项目根目录。
+
+### Q3: RuntimeError: Expected all tensors to be on the same device
+这个问题已经修复。预提取的特征会自动加载到正确的设备（GPU/CPU）。
+如果仍有问题，检查：
+```python
+print(train_ROI.device)  # 应该显示 cuda:0 或 cpu
 ```
 
-### Q3: CUDA out of memory
+### Q4: CUDA out of memory
 降低 batch_size:
 ```python
 batch_size = 32  # 或 16
 ```
+
+或使用 CPU 训练（慢但不需要 GPU 内存）：
+- 在代码开头会自动检测并使用 CPU 如果没有 GPU
 
 ## 加载已训练模型
 

@@ -1154,16 +1154,17 @@ if __name__ == "__main__":
     # ==================== Load Pre-extracted Features (if enabled) ====================
     if USE_PREEXTRACTED_FEATURES:
         print("\nLoading pre-extracted features...")
-        train_ROI = torch.load(f'{FEATURE_DIR}/train_ROI.pt')
-        train_ENT = torch.load(f'{FEATURE_DIR}/train_ENT.pt')
-        val_ROI = torch.load(f'{FEATURE_DIR}/val_ROI.pt')
-        val_ENT = torch.load(f'{FEATURE_DIR}/val_ENT.pt')
-        test_ROI = torch.load(f'{FEATURE_DIR}/test_ROI.pt')
-        test_ENT = torch.load(f'{FEATURE_DIR}/test_ENT.pt')
+        train_ROI = torch.load(f'{FEATURE_DIR}/train_ROI.pt').to(device)
+        train_ENT = torch.load(f'{FEATURE_DIR}/train_ENT.pt').to(device)
+        val_ROI = torch.load(f'{FEATURE_DIR}/val_ROI.pt').to(device)
+        val_ENT = torch.load(f'{FEATURE_DIR}/val_ENT.pt').to(device)
+        test_ROI = torch.load(f'{FEATURE_DIR}/test_ROI.pt').to(device)
+        test_ENT = torch.load(f'{FEATURE_DIR}/test_ENT.pt').to(device)
 
         print(f"  ✓ Train: ROI {train_ROI.shape}, ENT {train_ENT.shape}")
         print(f"  ✓ Val:   ROI {val_ROI.shape}, ENT {val_ENT.shape}")
         print(f"  ✓ Test:  ROI {test_ROI.shape}, ENT {test_ENT.shape}")
+        print(f"  ✓ Features loaded to device: {device}")
     else:
         # Initialize VGG16 and SentenceTransformer for on-demand extraction
         print("\nInitializing models for on-demand feature extraction...")
