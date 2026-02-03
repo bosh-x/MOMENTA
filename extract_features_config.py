@@ -13,40 +13,40 @@
 DATASET_TO_USE = 'Harm-C'  # 修改这里来切换数据集
 
 # ==================== 数据集配置 ====================
+# 注意：图片有两个位置：
+# - HarMeme_V1/images_flat/ (所有图片在一起，扁平结构)
+# - HarMeme_V1/images/HarMeme_Images/harmeme_images_covid_19/ 或 harmeme_images_us_pol/ (分类结构)
+# 两者都可以使用，下面使用的是分类结构
+
 DATASETS = {
     'Harm-C': {
         'name': 'Harm-C (COVID-19)',
         'train': {
             'data_path': 'HarMeme_V1/Annotations/Harm-C/train.jsonl',
-            # 选项1：如果图片在 images_flat/ 目录下（扁平结构）
-            'img_dir': 'HarMeme_V1/images_flat',
-            # 选项2：如果图片在 images/HarMeme_Images/harmeme_images_covid_19/ 下
-            # 'img_dir': 'HarMeme_V1/images/HarMeme_Images/harmeme_images_covid_19',
+            'img_dir': 'HarMeme_V1/images/HarMeme_Images/harmeme_images_covid_19',
         },
         'val': {
             'data_path': 'HarMeme_V1/Annotations/Harm-C/val.jsonl',
-            'img_dir': 'HarMeme_V1/images_flat',
-            # 'img_dir': 'HarMeme_V1/images/HarMeme_Images/harmeme_images_covid_19',
+            'img_dir': 'HarMeme_V1/images/HarMeme_Images/harmeme_images_covid_19',
         },
         'test': {
             'data_path': 'HarMeme_V1/Annotations/Harm-C/test.jsonl',
-            'img_dir': 'HarMeme_V1/images_flat',
-            # 'img_dir': 'HarMeme_V1/images/HarMeme_Images/harmeme_images_covid_19',
+            'img_dir': 'HarMeme_V1/images/HarMeme_Images/harmeme_images_covid_19',
         }
     },
     'Harm-P': {
         'name': 'Harm-P (Politics)',
         'train': {
             'data_path': 'HarMeme_V1/Annotations/Harm-P/train_v1.jsonl',
-            'img_dir': 'HarMeme_V1/images_flat',
+            'img_dir': 'HarMeme_V1/images/HarMeme_Images/harmeme_images_us_pol',
         },
         'val': {
             'data_path': 'HarMeme_V1/Annotations/Harm-P/val_v1.jsonl',
-            'img_dir': 'HarMeme_V1/images_flat',
+            'img_dir': 'HarMeme_V1/images/HarMeme_Images/harmeme_images_us_pol',
         },
         'test': {
             'data_path': 'HarMeme_V1/Annotations/Harm-P/test_v1.jsonl',
-            'img_dir': 'HarMeme_V1/images_flat',
+            'img_dir': 'HarMeme_V1/images/HarMeme_Images/harmeme_images_us_pol',
         }
     }
 }
