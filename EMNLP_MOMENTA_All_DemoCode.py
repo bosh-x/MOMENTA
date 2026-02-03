@@ -1105,6 +1105,20 @@ if __name__ == "__main__":
 
     torch.cuda.empty_cache()
 
+    # ==================== Configuration ====================
+    # Set to True to use pre-extracted features, False to extract on-demand
+    USE_PREEXTRACTED_FEATURES = True
+
+    # Dataset configuration
+    DATASET_NAME = "Harm-C"  # Change to your dataset: "Harm-C" or "Harm-P"
+    FEATURE_DIR = f'./extracted_features/{DATASET_NAME}'
+
+    print("="*60)
+    print(f"Using pre-extracted features: {USE_PREEXTRACTED_FEATURES}")
+    if USE_PREEXTRACTED_FEATURES:
+        print(f"Feature directory: {FEATURE_DIR}")
+    print("="*60)
+
     # Load test data
     test_samples_frame = pd.read_json(test_path_pol, lines=True)
     test_samples_frame.head()
@@ -1128,25 +1142,45 @@ if __name__ == "__main__":
     ])
     tokenizer = SimpleTokenizer()
 
-    # Initialize VGG16 model
-    model_vgg_pretrained = models.vgg16(pretrained=True)
-    model_vgg = FeatureExtractor(model_vgg_pretrained)
-    model_vgg = model_vgg.to(device)
+    # ==================== Load Pre-extracted Features (if enabled) ====================
+    if USE_PREEXTRACTED_FEATURES:
+        print("\nLoading pre-extracted features...")
+        train_ROI = torch.load(f'{FEATURE_DIR}/train_ROI.pt')
+        train_ENT = torch.load(f'{FEATURE_DIR}/train_ENT.pt')
+        val_ROI = torch.load(f'{FEATURE_DIR}/val_ROI.pt')
+        val_ENT = torch.load(f'{FEATURE_DIR}/val_ENT.pt')
+        test_ROI = torch.load(f'{FEATURE_DIR}/test_ROI.pt')
+        test_ENT = torch.load(f'{FEATURE_DIR}/test_ENT.pt')
 
-    # Initialize SentenceTransformer
-    from sentence_transformers import SentenceTransformer
-    model_sent_trans = SentenceTransformer('paraphrase-distilroberta-base-v1')
+        print(f"  ✓ Train: ROI {train_ROI.shape}, ENT {train_ENT.shape}")
+        print(f"  ✓ Val:   ROI {val_ROI.shape}, ENT {val_ENT.shape}")
+        print(f"  ✓ Test:  ROI {test_ROI.shape}, ENT {test_ENT.shape}")
+    else:
+        # Initialize VGG16 and SentenceTransformer for on-demand extraction
+        print("\nInitializing models for on-demand feature extraction...")
+        model_vgg_pretrained = models.vgg16(pretrained=True)
+        model_vgg = FeatureExtractor(model_vgg_pretrained)
+        model_vgg = model_vgg.to(device)
 
-    # Create datasets and dataloaders with on-demand feature extraction
-    hm_dataset_train = HarmemeMemesDatasetAug2(train_path_pol, data_dir_pol, split_flag='train', use_preextracted=False)
+        from sentence_transformers import SentenceTransformer
+        model_sent_trans = SentenceTransformer('paraphrase-distilroberta-base-v1')
+        print("  ✓ VGG16 and SentenceTransformer initialized")
+
+    # Create datasets and dataloaders
+    print("\nCreating datasets...")
+    hm_dataset_train = HarmemeMemesDatasetAug2(train_path_pol, data_dir_pol, split_flag='train', use_preextracted=USE_PREEXTRACTED_FEATURES)
     dataloader_train = DataLoader(hm_dataset_train, batch_size=64,
                             shuffle=True, num_workers=0)
-    hm_dataset_val = HarmemeMemesDatasetAug2(dev_path_pol, data_dir_pol, split_flag='val', use_preextracted=False)
+    hm_dataset_val = HarmemeMemesDatasetAug2(dev_path_pol, data_dir_pol, split_flag='val', use_preextracted=USE_PREEXTRACTED_FEATURES)
     dataloader_val = DataLoader(hm_dataset_val, batch_size=64,
                             shuffle=True, num_workers=0)
-    hm_dataset_test = HarmemeMemesDatasetAug2(test_path_pol, data_dir_pol, split_flag='test', use_preextracted=False)
+    hm_dataset_test = HarmemeMemesDatasetAug2(test_path_pol, data_dir_pol, split_flag='test', use_preextracted=USE_PREEXTRACTED_FEATURES)
     dataloader_test = DataLoader(hm_dataset_test, batch_size=64,
                             shuffle=False, num_workers=0)
+
+    print(f"  ✓ Train dataset: {len(hm_dataset_train)} samples")
+    print(f"  ✓ Val dataset:   {len(hm_dataset_val)} samples")
+    print(f"  ✓ Test dataset:  {len(hm_dataset_test)} samples")
 
     # Model setup
     # output_size = 1 #Binary case
