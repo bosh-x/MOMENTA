@@ -32,7 +32,7 @@ print(f"\n✓ Using device: {device}")
 print("\n[1/5] Checking required files...")
 required_files = [
     'HarMeme_V1/Annotations/Harm-C/train.jsonl',
-    'HarMeme_V1/images_flat',
+    'HarMeme_V1/images/HarMeme_Images/harmeme_images_covid_19',
     'clip_model.pt',
     'bpe_simple_vocab_16e6.txt.gz'
 ]
@@ -92,7 +92,7 @@ print("\n[3/5] Creating dataset...")
 try:
     dataset = demo.HarmemeMemesDatasetAug2(
         data_path='HarMeme_V1/Annotations/Harm-C/train.jsonl',
-        img_dir='HarMeme_V1/images_flat',
+        img_dir='HarMeme_V1/images/HarMeme_Images/harmeme_images_covid_19',
         split_flag='train',
         use_preextracted=False  # 实时提取
     )
