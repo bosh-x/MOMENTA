@@ -31,6 +31,13 @@ from pathlib import Path
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+# Global variables for models (initialized in __main__ or by user)
+clip_model = None
+preprocess = None
+tokenizer = None
+model_vgg = None
+model_sent_trans = None
+
 
 # In[ ]:
 
@@ -412,6 +419,15 @@ def get_image_vgg_center(in_im):
 # In[ ]:
 
 
+# Global variables for pre-extracted features (only used if use_preextracted=True)
+train_ROI = None
+val_ROI = None
+test_ROI = None
+train_ENT = None
+val_ENT = None
+test_ENT = None
+
+
 class HarmemeMemesDatasetAug2(torch.utils.data.Dataset):
     """Uses jsonl data to preprocess and serve
     dictionary of multimodal tensors for model input.
@@ -425,6 +441,7 @@ class HarmemeMemesDatasetAug2(torch.utils.data.Dataset):
         balance=False,
         dev_limit=None,
         random_state=0,
+        use_preextracted=False,
     ):
 
         self.samples_frame = pd.read_json(
@@ -436,15 +453,30 @@ class HarmemeMemesDatasetAug2(torch.utils.data.Dataset):
         self.samples_frame.image = self.samples_frame.apply(
             lambda row: (img_dir + '/' + row.image), axis=1
         )
-        if split_flag=='train':
-            self.ROI_samples = train_ROI
-            self.ENT_samples = train_ENT
-        elif split_flag=='val':
-            self.ROI_samples = val_ROI
-            self.ENT_samples = val_ENT
+
+        self.use_preextracted = use_preextracted
+
+        if use_preextracted:
+            # Use pre-extracted features from global variables
+            if split_flag=='train':
+                self.ROI_samples = train_ROI
+                self.ENT_samples = train_ENT
+            elif split_flag=='val':
+                self.ROI_samples = val_ROI
+                self.ENT_samples = val_ENT
+            else:
+                self.ROI_samples = test_ROI
+                self.ENT_samples = test_ENT
+
+            if self.ROI_samples is None or self.ENT_samples is None:
+                raise ValueError(
+                    f"use_preextracted=True but features not found for split_flag='{split_flag}'. "
+                    f"Please load train_ROI/val_ROI/test_ROI and train_ENT/val_ENT/test_ENT first."
+                )
         else:
-            self.ROI_samples = test_ROI
-            self.ENT_samples = test_ENT
+            # Will extract features on-demand in __getitem__
+            self.ROI_samples = None
+            self.ENT_samples = None
 
     def __len__(self):
         """This method is called when you do len(instance)
@@ -463,57 +495,57 @@ class HarmemeMemesDatasetAug2(torch.utils.data.Dataset):
         img_file_name = self.samples_frame.loc[idx, "image"]
 
         image_clip_input = process_image_clip(self.samples_frame.loc[idx, "image"])
-# --------------------------------------------------------------------------------------
-#         Pre-extracted features
-        image_vgg_feature = self.ROI_samples[idx]
 
-# --------------------------------------------------------------------------------------
-# On-demand computation
-#         BB_info = self.samples_frame.loc[idx, "bbdict"]
-#         roi_vgg_feat_list = []
-#         if BB_info:
-#             total_BB = len(BB_info)
-#             if total_BB>4:
-#                 BB_info_final = BB_info[:4]
-#             else:
-#                 BB_info_final = BB_info
-# #             Have to get VGG reps for each cropped BB and get the mean
-#             for item in BB_info_final:
-# #                 Get the top left (left,top) and bottom right (right,bottom) values of the coordinates
-# #                 top left and bottom right value extraction
-#                 left   = item['Vertices'][3][0]
-#                 top    = item['Vertices'][3][1]
-#                 right  = item['Vertices'][1][0]
-#                 bottom = item['Vertices'][1][1]
-#                 get_image_vgg_center(img_file_name)
-#                 roi_vgg_feat = get_image_vgg_BB(left, top, right, bottom, img_file_name)
-#                 roi_vgg_feat_list.append(roi_vgg_feat)
-# #             print(np.shape(roi_vgg_feat_list))
-# #             print(torch.cat(roi_vgg_feat_list, dim=0))
-# #             print(np.mean(np.array(roi_vgg_feat_list), axis=0))
-#             image_vgg_feature = torch.mean(torch.vstack(roi_vgg_feat_list), axis=0)
-# #             print(image_vgg_feature.shape)
-#         else:
-#             image_vgg_feature = torch.tensor(get_image_vgg_center(img_file_name))
-# --------------------------------------------------------------------------------------
+        # --------------------------------------------------------------------------------------
+        # ROI/VGG features: Use pre-extracted or compute on-demand
+        if self.use_preextracted:
+            # Pre-extracted features
+            image_vgg_feature = self.ROI_samples[idx]
+        else:
+            # On-demand computation
+            BB_info = self.samples_frame.loc[idx, "bbdict"] if "bbdict" in self.samples_frame.columns else None
+            roi_vgg_feat_list = []
+            if BB_info:
+                total_BB = len(BB_info)
+                if total_BB>4:
+                    BB_info_final = BB_info[:4]
+                else:
+                    BB_info_final = BB_info
+                # Have to get VGG reps for each cropped BB and get the mean
+                for item in BB_info_final:
+                    # Get the top left (left,top) and bottom right (right,bottom) values of the coordinates
+                    # top left and bottom right value extraction
+                    left   = item['Vertices'][3][0]
+                    top    = item['Vertices'][3][1]
+                    right  = item['Vertices'][1][0]
+                    bottom = item['Vertices'][1][1]
+                    roi_vgg_feat = get_image_vgg_BB(left, top, right, bottom, img_file_name)
+                    roi_vgg_feat_list.append(roi_vgg_feat)
+                image_vgg_feature = torch.mean(torch.vstack(roi_vgg_feat_list), axis=0)
+            else:
+                image_vgg_feature = torch.tensor(get_image_vgg_center(img_file_name))
+        # --------------------------------------------------------------------------------------
+
         text_clip_input = process_text_clip(self.samples_frame.loc[idx, "text"])
-#         -------------------------------------------------------------------------------
-#         Process entities
-        #         Use them directly from the saved files
-        text_drob_feature = self.ENT_samples[idx]
-#         -------------------------------------------------------------------------------
-#         Get the mean representation for the set of entities ""on-demand
-#         cur_ent_rep_list = []
-#         cur_ent_list = self.samples_frame.loc[idx, "ent"]
 
-#         if len(cur_ent_list):
-#             for item in cur_ent_list:
-#                 cur_ent_rep = torch.tensor(model_sent_trans.encode(item)).to(device)
-#                 cur_ent_rep_list.append(cur_ent_rep)
-#             text_drob_feature = torch.mean(torch.vstack(cur_ent_rep_list), axis=0)
-#         else:
-#             text_drob_feature = torch.tensor(model_sent_trans.encode(self.samples_frame.loc[idx, "text"])).to(device)
-#         -------------------------------------------------------------------------------
+        # -------------------------------------------------------------------------------
+        # Entity features: Use pre-extracted or compute on-demand
+        if self.use_preextracted:
+            # Use them directly from the saved files
+            text_drob_feature = self.ENT_samples[idx]
+        else:
+            # Get the mean representation for the set of entities on-demand
+            cur_ent_rep_list = []
+            cur_ent_list = self.samples_frame.loc[idx, "ent"] if "ent" in self.samples_frame.columns else []
+
+            if len(cur_ent_list):
+                for item in cur_ent_list:
+                    cur_ent_rep = torch.tensor(model_sent_trans.encode(item)).to(device)
+                    cur_ent_rep_list.append(cur_ent_rep)
+                text_drob_feature = torch.mean(torch.vstack(cur_ent_rep_list), axis=0)
+            else:
+                text_drob_feature = torch.tensor(model_sent_trans.encode(self.samples_frame.loc[idx, "text"])).to(device)
+        # -------------------------------------------------------------------------------
 
         if "labels" in self.samples_frame.columns:
 #             label = torch.Tensor(
@@ -1069,6 +1101,9 @@ def calculate_mmae(expected, predicted, classes):
 
 
 if __name__ == "__main__":
+    # Declare global variables that are used by processing functions
+    global clip_model, preprocess, tokenizer, model_vgg, model_sent_trans
+
     print(device)
 
     torch.cuda.empty_cache()
@@ -1105,14 +1140,14 @@ if __name__ == "__main__":
     from sentence_transformers import SentenceTransformer
     model_sent_trans = SentenceTransformer('paraphrase-distilroberta-base-v1')
 
-    # Create datasets and dataloaders
-    hm_dataset_train = HarmemeMemesDatasetAug2(train_path_pol, data_dir_pol, split_flag='train')
+    # Create datasets and dataloaders with on-demand feature extraction
+    hm_dataset_train = HarmemeMemesDatasetAug2(train_path_pol, data_dir_pol, split_flag='train', use_preextracted=False)
     dataloader_train = DataLoader(hm_dataset_train, batch_size=64,
                             shuffle=True, num_workers=0)
-    hm_dataset_val = HarmemeMemesDatasetAug2(dev_path_pol, data_dir_pol, split_flag='val')
+    hm_dataset_val = HarmemeMemesDatasetAug2(dev_path_pol, data_dir_pol, split_flag='val', use_preextracted=False)
     dataloader_val = DataLoader(hm_dataset_val, batch_size=64,
                             shuffle=True, num_workers=0)
-    hm_dataset_test = HarmemeMemesDatasetAug2(test_path_pol, data_dir_pol, split_flag='test')
+    hm_dataset_test = HarmemeMemesDatasetAug2(test_path_pol, data_dir_pol, split_flag='test', use_preextracted=False)
     dataloader_test = DataLoader(hm_dataset_test, batch_size=64,
                             shuffle=False, num_workers=0)
 
