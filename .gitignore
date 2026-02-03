@@ -3,3 +3,6 @@ HarMeme_V1/images/
 HarMeme_V1/images_flat/
 __pycache__/
 bpe_simple_vocab_16e6.txt.gz
+*.pt
+checkpoints/
+extracted_features/
