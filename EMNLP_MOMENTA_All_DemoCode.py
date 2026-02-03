@@ -1109,18 +1109,27 @@ if __name__ == "__main__":
     # Set to True to use pre-extracted features, False to extract on-demand
     USE_PREEXTRACTED_FEATURES = True
 
-    # Dataset configuration
-    DATASET_NAME = "Harm-C"  # Change to your dataset: "Harm-C" or "Harm-P"
-    FEATURE_DIR = f'./extracted_features/{DATASET_NAME}'
+    # Import dataset configuration
+    from extract_features_config import DATA_CONFIG, DATASET_TO_USE, print_config
+
+    FEATURE_DIR = f'./extracted_features/{DATASET_TO_USE}'
 
     print("="*60)
     print(f"Using pre-extracted features: {USE_PREEXTRACTED_FEATURES}")
     if USE_PREEXTRACTED_FEATURES:
         print(f"Feature directory: {FEATURE_DIR}")
-    print("="*60)
+    print_config()
+
+    # Load data paths from config
+    train_data_path = DATA_CONFIG['train']['data_path']
+    train_img_dir = DATA_CONFIG['train']['img_dir']
+    val_data_path = DATA_CONFIG['val']['data_path']
+    val_img_dir = DATA_CONFIG['val']['img_dir']
+    test_data_path = DATA_CONFIG['test']['data_path']
+    test_img_dir = DATA_CONFIG['test']['img_dir']
 
     # Load test data
-    test_samples_frame = pd.read_json(test_path_pol, lines=True)
+    test_samples_frame = pd.read_json(test_data_path, lines=True)
     test_samples_frame.head()
 
     # Load CLIP model
@@ -1168,13 +1177,13 @@ if __name__ == "__main__":
 
     # Create datasets and dataloaders
     print("\nCreating datasets...")
-    hm_dataset_train = HarmemeMemesDatasetAug2(train_path_pol, data_dir_pol, split_flag='train', use_preextracted=USE_PREEXTRACTED_FEATURES)
+    hm_dataset_train = HarmemeMemesDatasetAug2(train_data_path, train_img_dir, split_flag='train', use_preextracted=USE_PREEXTRACTED_FEATURES)
     dataloader_train = DataLoader(hm_dataset_train, batch_size=64,
                             shuffle=True, num_workers=0)
-    hm_dataset_val = HarmemeMemesDatasetAug2(dev_path_pol, data_dir_pol, split_flag='val', use_preextracted=USE_PREEXTRACTED_FEATURES)
+    hm_dataset_val = HarmemeMemesDatasetAug2(val_data_path, val_img_dir, split_flag='val', use_preextracted=USE_PREEXTRACTED_FEATURES)
     dataloader_val = DataLoader(hm_dataset_val, batch_size=64,
                             shuffle=True, num_workers=0)
-    hm_dataset_test = HarmemeMemesDatasetAug2(test_path_pol, data_dir_pol, split_flag='test', use_preextracted=USE_PREEXTRACTED_FEATURES)
+    hm_dataset_test = HarmemeMemesDatasetAug2(test_data_path, test_img_dir, split_flag='test', use_preextracted=USE_PREEXTRACTED_FEATURES)
     dataloader_test = DataLoader(hm_dataset_test, batch_size=64,
                             shuffle=False, num_workers=0)
 
@@ -1183,14 +1192,18 @@ if __name__ == "__main__":
     print(f"  ✓ Test dataset:  {len(hm_dataset_test)} samples")
 
     # Model setup
-    # output_size = 1 #Binary case
-    output_size = 3
-    exp_name = "EMNLP_MCHarm_GLAREAll_COVTrain_POLEval"
-    # pre_trn_ckp = "EMNLP_MCHarm_GLAREAll_COVTrain" # Uncomment for using pre-trained
-    exp_path = "path_to_saved_files/EMNLP_ModelCkpt/"+exp_name
+    # Harm-C: 3 classes (not harmful, somewhat harmful, very harmful)
+    # Harm-P: 2 classes (not harmful, harmful)
+    output_size = 3 if DATASET_TO_USE == 'Harm-C' else 2
+    exp_name = f"MOMENTA_{DATASET_TO_USE}_{'MultiClass' if output_size == 3 else 'Binary'}"
+    exp_path = f"./checkpoints/{exp_name}"
     lr=0.001
-    # criterion = nn.BCELoss() #Binary case
     criterion = nn.CrossEntropyLoss()
+
+    print(f"\nModel Configuration:")
+    print(f"  Output size: {output_size} classes")
+    print(f"  Experiment name: {exp_name}")
+    print(f"  Checkpoint path: {exp_path}")
     # # ------------Fresh training------------
     model = MM(output_size)
     model.to(device)
@@ -1198,9 +1211,15 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
 
     # Import EarlyStopping
-    import sys
-    sys.path.append('path_to_the_module/early-stopping-pytorch')
-    from pytorchtools import EarlyStopping
+    try:
+        import sys
+        sys.path.append('early-stopping-pytorch')  # Adjust this path if needed
+        from pytorchtools import EarlyStopping
+        print("  ✓ EarlyStopping imported successfully")
+    except ImportError:
+        print("  ⚠ Warning: EarlyStopping not found. Please ensure pytorchtools is available.")
+        print("  You can download it from: https://github.com/Bjarten/early-stopping-pytorch")
+        raise
 
     # total_params = sum(p.numel() for p in model.parameters())
     # print(f"Total trainable parameters are: {total_params}")
@@ -1260,38 +1279,55 @@ if __name__ == "__main__":
     #     else:
     #         test_labels.append(1)
 
-    # Multiclass setting - Harmful
+    # Get predictions
     y_pred=[]
     for i in outputs:
-    #     print(np.argmax(i))
         y_pred.append(np.argmax(i))
-    # # np.argmax(outputs[:])
-    # outputs
 
-    # # Multiclass setting
+    # Get test labels based on dataset type
     test_labels=[]
     for index, row in test_samples_frame.iterrows():
         lab = row['labels'][0]
-        if lab=="not harmful":
-            test_labels.append(0)
-        elif lab=="somewhat harmful":
-            test_labels.append(1)
+        if DATASET_TO_USE == 'Harm-C':
+            # Multiclass setting (3 classes)
+            if lab=="not harmful":
+                test_labels.append(0)
+            elif lab=="somewhat harmful":
+                test_labels.append(1)
+            else:
+                test_labels.append(2)
         else:
-            test_labels.append(2)
+            # Binary setting (2 classes)
+            if lab=="not harmful":
+                test_labels.append(0)
+            else:
+                test_labels.append(1)
 
+    # Calculate metrics
     rec = np.round(recall_score(test_labels, y_pred, average="macro"),4)
     prec = np.round(precision_score(test_labels, y_pred, average="macro"),4)
     f1 = np.round(f1_score(test_labels, y_pred, average="macro"),4)
-    # hl = np.round(hamming_loss(test_labels, y_pred),4)
     acc = np.round(accuracy_score(test_labels, y_pred),4)
-    mmae = np.round(calculate_mmae(test_labels, y_pred, [0,1,2]),4)
     mae = np.round(mean_absolute_error(test_labels, y_pred),4)
-    # print("recall_score\t: ",rec)
-    # print("precision_score\t: ",prec)
-    # print("f1_score\t: ",f1)
-    # print("hamming_loss\t: ",hl)
-    # print("accuracy_score\t: ",f1)
+
+    # Calculate MMAE (only for multiclass)
+    if DATASET_TO_USE == 'Harm-C':
+        mmae = np.round(calculate_mmae(test_labels, y_pred, [0,1,2]),4)
+    else:
+        mmae = np.round(calculate_mmae(test_labels, y_pred, [0,1]),4)
+
+    print("\n" + "="*60)
+    print("Classification Report:")
+    print("="*60)
     print(classification_report(test_labels, y_pred))
 
-    print("Acc, F1, Rec, Prec, MAE, MMAE")
-    print(acc, f1, rec, prec, mae, mmae)
+    print("\n" + "="*60)
+    print("Summary Metrics:")
+    print("="*60)
+    print(f"Accuracy:  {acc}")
+    print(f"F1-Score:  {f1}")
+    print(f"Recall:    {rec}")
+    print(f"Precision: {prec}")
+    print(f"MAE:       {mae}")
+    print(f"MMAE:      {mmae}")
+    print("="*60)
