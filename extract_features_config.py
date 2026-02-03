@@ -18,15 +18,20 @@ DATASETS = {
         'name': 'Harm-C (COVID-19)',
         'train': {
             'data_path': 'HarMeme_V1/Annotations/Harm-C/train.jsonl',
+            # 选项1：如果图片在 images_flat/ 目录下（扁平结构）
             'img_dir': 'HarMeme_V1/images_flat',
+            # 选项2：如果图片在 images/HarMeme_Images/harmeme_images_covid_19/ 下
+            # 'img_dir': 'HarMeme_V1/images/HarMeme_Images/harmeme_images_covid_19',
         },
         'val': {
             'data_path': 'HarMeme_V1/Annotations/Harm-C/val.jsonl',
             'img_dir': 'HarMeme_V1/images_flat',
+            # 'img_dir': 'HarMeme_V1/images/HarMeme_Images/harmeme_images_covid_19',
         },
         'test': {
             'data_path': 'HarMeme_V1/Annotations/Harm-C/test.jsonl',
             'img_dir': 'HarMeme_V1/images_flat',
+            # 'img_dir': 'HarMeme_V1/images/HarMeme_Images/harmeme_images_covid_19',
         }
     },
     'Harm-P': {
