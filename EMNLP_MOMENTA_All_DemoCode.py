@@ -1101,9 +1101,6 @@ def calculate_mmae(expected, predicted, classes):
 
 
 if __name__ == "__main__":
-    # Declare global variables that are used by processing functions
-    global clip_model, preprocess, tokenizer, model_vgg, model_sent_trans
-
     print(device)
 
     torch.cuda.empty_cache()
